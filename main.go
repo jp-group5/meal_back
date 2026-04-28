@@ -1,0 +1,61 @@
+package main
+
+import (
+	"log"
+	"os"
+
+	"meal_back/handlers"
+	"meal_back/middlewares"
+	"meal_back/models"
+	"meal_back/stores"
+
+	"github.com/gin-gonic/gin"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
+)
+
+func main() {
+	dsn := os.Getenv("DB_DSN")
+	jwtSecret := os.Getenv("JWT_SECRET")
+
+	if dsn == "" {
+		log.Fatal("缺少环境变量 DB_DSN")
+	}
+	if jwtSecret == "" {
+		log.Fatal("缺少环境变量 JWT_SECRET")
+	}
+
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	if err != nil {
+		log.Fatalf("数据库连接失败: %v", err)
+	}
+
+	// 迁移顺序：先用户主表，再会话与资料扩展表。
+	if err := db.AutoMigrate(&models.User{}, &models.UserSession{}, &models.UserProfile{}); err != nil {
+		log.Fatalf("数据库迁移失败: %v", err)
+	}
+
+	tokenBlacklist := stores.NewTokenBlacklistStore()
+	authHandler := handlers.NewAuthHandler(db, jwtSecret, tokenBlacklist)
+
+	r := gin.Default()
+	apiV1 := r.Group("/api/v1")
+	{
+		apiV1.POST("/register", authHandler.Register)
+		apiV1.POST("/login", authHandler.Login)
+		apiV1.POST("/refresh", authHandler.RefreshToken)
+
+		authed := apiV1.Group("")
+		authed.Use(middlewares.AuthMiddleware(db, jwtSecret, tokenBlacklist))
+		authed.GET("/private/me", authHandler.Me)
+		authed.POST("/private/logout", authHandler.Logout)
+		authed.PUT("/private/me/profile", authHandler.UpsertProfile)
+		authed.POST("/private/me/profile", authHandler.UpsertProfile)
+		authed.PUT("/users/me/profile", authHandler.UpsertProfile)
+		authed.POST("/users/me/profile", authHandler.UpsertProfile)
+	}
+
+	if err := r.Run(":8080"); err != nil {
+		log.Fatalf("服务启动失败: %v", err)
+	}
+}
