@@ -2,68 +2,63 @@ package mock
 
 import (
 	"context"
-	"fmt"
-	"sync"
 
 	"ai-interation/internal/port"
 )
 
-type MealAnalysisRepositoryMock struct {
-	mu      sync.Mutex
-	records []port.MealAnalysisRecord
+type RepositoryMock struct{}
+
+func NewRepositoryMock() *RepositoryMock {
+	return &RepositoryMock{}
 }
 
-func NewMealAnalysisRepositoryMock() *MealAnalysisRepositoryMock {
-	return &MealAnalysisRepositoryMock{
-		records: make([]port.MealAnalysisRecord, 0),
-	}
-}
-
-func (r *MealAnalysisRepositoryMock) SaveMealAnalysis(ctx context.Context, record port.MealAnalysisRecord) error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	r.records = append(r.records, record)
-	fmt.Printf("[mock repository] saved meal analysis: filename=%s items=%d\n", record.Filename, len(record.Response.Items))
+func (r *RepositoryMock) SaveMealAnalysis(ctx context.Context, imageName string, analysisJSON string) error {
 	return nil
 }
 
-type RecommendationRepositoryMock struct{}
-
-func NewRecommendationRepositoryMock() *RecommendationRepositoryMock {
-	return &RecommendationRepositoryMock{}
+func (r *RepositoryMock) GetUserProfile(ctx context.Context, userID string) (port.UserProfile, error) {
+	return port.UserProfile{
+		UserID:        userID,
+		HeightCm:      170,
+		WeightKg:      65,
+		ExerciseHabit: "light",
+	}, nil
 }
 
-func (r *RecommendationRepositoryMock) GetRecommendationInputs(ctx context.Context, userID string, targetDate string) (port.RecommendationInputs, error) {
-	return port.RecommendationInputs{
-		Profile: port.UserProfile{
-			UserID:          userID,
-			HeightCm:        170,
-			WeightKg:        65,
-			ExerciseHabit:   "週2回の軽い運動",
-			PreferenceNotes: "和食寄り、魚を好む",
+func (r *RepositoryMock) GetMealLogs(ctx context.Context, userID string, targetDate string) ([]port.MealLog, error) {
+	return []port.MealLog{
+		{Date: targetDate, MenuName: "朝食: トースト", Calories: 320, Protein: 12, Fat: 10, Carbs: 45},
+		{Date: targetDate, MenuName: "昼食: カレー", Calories: 720, Protein: 20, Fat: 24, Carbs: 95},
+	}, nil
+}
+
+func (r *RepositoryMock) GetActivityLogs(ctx context.Context, userID string, targetDate string) ([]port.ActivityLog, error) {
+	return []port.ActivityLog{
+		{Date: targetDate, ActivityName: "walking", DurationMin: 30},
+	}, nil
+}
+
+var _ port.Repository = (*RepositoryMock)(nil)
+
+func (r *RepositoryMock) GetDietaryHistory(ctx context.Context, userID string, targetDate string) ([]port.DietaryHistory, error) {
+	return []port.DietaryHistory{
+		{
+			FoodName:  "Chicken Breast Salad",
+			MealType:  "lunch",
+			Timestamp: "2026-04-28T12:30:00Z",
+			Tags:      []string{"high_protein", "clean_eating"},
 		},
-		Activities: []port.ActivityLog{
-			{
-				Date:        targetDate,
-				Description: "通勤で徒歩移動が多い",
-			},
-			{
-				Date:        targetDate,
-				Description: "夕方に軽い散歩を実施",
-			},
+		{
+			FoodName:  "Double Cheese Burger",
+			MealType:  "dinner",
+			Timestamp: "2026-04-27T19:00:00Z",
+			Tags:      []string{"high_fat", "heavy"},
 		},
-		MealRecords: []port.MealRecord{
-			{
-				Date:  targetDate,
-				Meal:  "朝食: トースト、卵、ヨーグルト",
-				Notes: "炭水化物やや多め",
-			},
-			{
-				Date:  targetDate,
-				Meal:  "昼食: ラーメン",
-				Notes: "脂質と塩分がやや多め",
-			},
+		{
+			FoodName:  "Yogurt and Banana",
+			MealType:  "breakfast",
+			Timestamp: "2026-04-26T08:00:00Z",
+			Tags:      []string{"light", "easy"},
 		},
 	}, nil
 }

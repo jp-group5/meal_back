@@ -1,37 +1,41 @@
 package handler
 
 import (
+	"io"
 	"net/http"
 
-	"ai-interation/internal/usecase"
-
 	"github.com/gin-gonic/gin"
+
+	"ai-interation/internal/usecase"
 )
 
 type MealAnalysisHandler struct {
 	usecase *usecase.MealAnalysisUsecase
 }
 
-func NewMealAnalysisHandler(usecase *usecase.MealAnalysisUsecase) *MealAnalysisHandler {
-	return &MealAnalysisHandler{usecase: usecase}
+func NewMealAnalysisHandler(u *usecase.MealAnalysisUsecase) *MealAnalysisHandler {
+	return &MealAnalysisHandler{usecase: u}
 }
 
 func (h *MealAnalysisHandler) Analyze(c *gin.Context) {
-	fileHeader, err := c.FormFile("image")
+	file, header, err := c.Request.FormFile("image")
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "image file is required in form field 'image'",
-		})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "image is required"})
+		return
+	}
+	defer file.Close()
+
+	imageBytes, err := io.ReadAll(file)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "failed to read image"})
 		return
 	}
 
-	resp, err := h.usecase.Analyze(c.Request.Context(), fileHeader)
+	res, err := h.usecase.Analyze(c.Request.Context(), imageBytes, header.Filename)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": err.Error(),
-		})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, resp)
+	c.JSON(http.StatusOK, res)
 }

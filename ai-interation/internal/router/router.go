@@ -1,23 +1,15 @@
 package router
 
 import (
-	"ai-interation/internal/handler"
-	"ai-interation/internal/usecase"
-
 	"github.com/gin-gonic/gin"
+
+	"ai-interation/internal/handler"
 )
 
-func NewRouter(mealAnalysisUsecase *usecase.MealAnalysisUsecase, recommendationUsecase *usecase.RecommendationUsecase) *gin.Engine {
-	r := gin.Default()
-
-	mealAnalysisHandler := handler.NewMealAnalysisHandler(mealAnalysisUsecase)
-	recommendationHandler := handler.NewRecommendationHandler(recommendationUsecase)
-
+func RegisterRoutes(r *gin.Engine, mealHandler *handler.MealAnalysisHandler, recHandler *handler.RecommendationHandler) {
 	v1 := r.Group("/api/v1")
 	{
-		v1.POST("/meal-analysis", mealAnalysisHandler.Analyze)
-		v1.POST("/recommendation", recommendationHandler.Generate)
+		v1.POST("/meal-analysis", mealHandler.Analyze)
+		v1.POST("/recommendation", recHandler.Generate)
 	}
-
-	return r
 }

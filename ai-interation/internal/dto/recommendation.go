@@ -13,5 +13,5 @@ type RecommendationItem struct {
 
 type RecommendationResponse struct {
 	Recommendations []RecommendationItem `json:"recommendations"`
-	Error           *string              `json:"error"`
+	Error           any                  `json:"error"`
 }
