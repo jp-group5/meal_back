@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { storeToRefs } from 'pinia'
+import { computed } from 'vue'
 import { RouterLink, RouterView } from 'vue-router'
 
 import { useUserStore } from '@/stores/user'
 
 const userStore = useUserStore()
-const { initials, isLoggedIn, name } = storeToRefs(userStore)
+const { initials, isLoggedIn, name, questionnaireCompleted } = storeToRefs(userStore)
+const profileEntryPath = computed(() => (questionnaireCompleted.value ? '/profile' : '/onboarding'))
 </script>
 
 <template>
@@ -18,7 +20,7 @@ const { initials, isLoggedIn, name } = storeToRefs(userStore)
 
       <nav class="nav-list" aria-label="Main navigation">
         <RouterLink to="/">Dashboard</RouterLink>
-        <RouterLink v-if="isLoggedIn" to="/profile">Profile</RouterLink>
+        <RouterLink v-if="isLoggedIn" :to="profileEntryPath">Profile</RouterLink>
       </nav>
     </aside>
 
@@ -32,7 +34,7 @@ const { initials, isLoggedIn, name } = storeToRefs(userStore)
         <RouterLink
           v-if="isLoggedIn"
           class="avatar-link"
-          to="/profile"
+          :to="profileEntryPath"
           aria-label="Open profile page"
           :title="name"
         >
