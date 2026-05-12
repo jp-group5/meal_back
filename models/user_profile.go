@@ -14,6 +14,8 @@ type UserProfile struct {
 
 	HeightCM           *float64 `gorm:"type:numeric(5,2)" json:"height_cm,omitempty"`
 	WeightKG           *float64 `gorm:"type:numeric(5,2)" json:"weight_kg,omitempty"`
+	Allergies          []string `gorm:"type:jsonb;serializer:json" json:"allergies,omitempty"`
+	DietaryPreferences []string `gorm:"type:jsonb;serializer:json" json:"dietary_preferences,omitempty"`
 	ExerciseExperience string   `gorm:"type:text" json:"exercise_experience,omitempty"`
 	FitnessGoal        string   `gorm:"type:varchar(32)" json:"fitness_goal,omitempty"`
 	MonthlyDietBudget  *int64   `gorm:"type:bigint" json:"monthly_diet_budget,omitempty"`

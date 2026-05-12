@@ -30,13 +30,20 @@ func main() {
 		log.Fatalf("数据库连接失败: %v", err)
 	}
 
-	// 迁移顺序：先用户主表，再会话与资料扩展表。
-	if err := db.AutoMigrate(&models.User{}, &models.UserSession{}, &models.UserProfile{}); err != nil {
+	// 迁移顺序：先用户主表，再会话/资料/业务记录表。
+	if err := db.AutoMigrate(
+		&models.User{},
+		&models.UserSession{},
+		&models.UserProfile{},
+		&models.MealRecord{},
+		&models.ActivityRecord{},
+	); err != nil {
 		log.Fatalf("数据库迁移失败: %v", err)
 	}
 
 	tokenBlacklist := stores.NewTokenBlacklistStore()
 	authHandler := handlers.NewAuthHandler(db, jwtSecret, tokenBlacklist)
+	nutritionHandler := handlers.NewNutritionHandler(db)
 
 	r := gin.Default()
 	apiV1 := r.Group("/api/v1")
@@ -53,6 +60,21 @@ func main() {
 		authed.POST("/private/me/profile", authHandler.UpsertProfile)
 		authed.PUT("/users/me/profile", authHandler.UpsertProfile)
 		authed.POST("/users/me/profile", authHandler.UpsertProfile)
+		authed.PUT("/users/me/preferences", nutritionHandler.UpsertPreferences)
+		authed.PUT("/private/me/preferences", nutritionHandler.UpsertPreferences)
+
+		authed.GET("/meals", nutritionHandler.GetMealsByDate)
+		authed.POST("/meals", nutritionHandler.CreateMeal)
+		authed.PUT("/meals/:id", nutritionHandler.UpdateMeal)
+		authed.DELETE("/meals/:id", nutritionHandler.DeleteMeal)
+
+		authed.GET("/activities", nutritionHandler.GetActivitiesByDate)
+		authed.POST("/activities", nutritionHandler.CreateActivity)
+		authed.PUT("/activities/:id", nutritionHandler.UpdateActivity)
+		authed.DELETE("/activities/:id", nutritionHandler.DeleteActivity)
+
+		authed.POST("/recommendations", nutritionHandler.GetRecommendation)
+		authed.GET("/recommendations/prompt", nutritionHandler.PreviewRecommendationPrompt)
 	}
 
 	if err := r.Run(":8080"); err != nil {

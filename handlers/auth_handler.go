@@ -516,6 +516,8 @@ func buildUserPayload(user models.User, profile *models.UserProfile) gin.H {
 		"bio":                 profile.Bio,
 		"height_cm":           profile.HeightCM,
 		"weight_kg":           profile.WeightKG,
+		"allergies":           profile.Allergies,
+		"dietary_preferences": profile.DietaryPreferences,
 		"exercise_experience": profile.ExerciseExperience,
 		"training_experience": trainingExperience,
 		"fitness_goal":        profile.FitnessGoal,
@@ -525,6 +527,8 @@ func buildUserPayload(user models.User, profile *models.UserProfile) gin.H {
 
 	payload["height_cm"] = profile.HeightCM
 	payload["weight_kg"] = profile.WeightKG
+	payload["allergies"] = profile.Allergies
+	payload["dietary_preferences"] = profile.DietaryPreferences
 	payload["exercise_experience"] = profile.ExerciseExperience
 	payload["training_experience"] = trainingExperience
 	payload["fitness_goal"] = profile.FitnessGoal
