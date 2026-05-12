@@ -30,38 +30,38 @@ func AuthMiddleware(db *gorm.DB, jwtSecret string, tokenBlacklist *stores.TokenB
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
-			response.Error(c, http.StatusUnauthorized, codeUnauthorized, "缺少 Authorization 头")
+			response.Error(c, http.StatusUnauthorized, codeUnauthorized, "Missing Authorization header.")
 			c.Abort()
 			return
 		}
 
 		parts := strings.SplitN(authHeader, " ", 2)
 		if len(parts) != 2 || !strings.EqualFold(parts[0], "Bearer") {
-			response.Error(c, http.StatusUnauthorized, codeUnauthorized, "Authorization 格式错误，应为 Bearer <token>")
+			response.Error(c, http.StatusUnauthorized, codeUnauthorized, "Invalid Authorization format. Expected: Bearer <token>.")
 			c.Abort()
 			return
 		}
 
 		tokenString := strings.TrimSpace(parts[1])
 		if tokenString == "" {
-			response.Error(c, http.StatusUnauthorized, codeUnauthorized, "Token 不能为空")
+			response.Error(c, http.StatusUnauthorized, codeUnauthorized, "Token cannot be empty.")
 			c.Abort()
 			return
 		}
 
 		claims, err := tokenService.ParseToken(tokenString)
 		if err != nil {
-			response.Error(c, http.StatusUnauthorized, codeUnauthorized, "无效或已过期的 Token")
+			response.Error(c, http.StatusUnauthorized, codeUnauthorized, "Invalid or expired token.")
 			c.Abort()
 			return
 		}
 		if claims.TokenType != auth.TokenTypeAccess {
-			response.Error(c, http.StatusUnauthorized, codeUnauthorized, "仅允许使用 access token 访问")
+			response.Error(c, http.StatusUnauthorized, codeUnauthorized, "Only access tokens are allowed.")
 			c.Abort()
 			return
 		}
 		if tokenBlacklist != nil && tokenBlacklist.IsBlacklisted(claims.ID) {
-			response.Error(c, http.StatusUnauthorized, codeUnauthorized, "Token 已失效，请重新登录")
+			response.Error(c, http.StatusUnauthorized, codeUnauthorized, "Token is revoked. Please log in again.")
 			c.Abort()
 			return
 		}
@@ -70,17 +70,17 @@ func AuthMiddleware(db *gorm.DB, jwtSecret string, tokenBlacklist *stores.TokenB
 		var session models.UserSession
 		if err := db.Where("access_token_jti = ? AND is_revoked = ?", claims.ID, false).First(&session).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
-				response.Error(c, http.StatusUnauthorized, codeUnauthorized, "会话不存在或已失效，请重新登录")
+				response.Error(c, http.StatusUnauthorized, codeUnauthorized, "Session not found or revoked. Please log in again.")
 				c.Abort()
 				return
 			}
-			response.Error(c, http.StatusUnauthorized, codeUnauthorized, "会话校验失败")
+			response.Error(c, http.StatusUnauthorized, codeUnauthorized, "Failed to validate session.")
 			c.Abort()
 			return
 		}
 
 		if time.Now().After(session.AccessExpiresAt) {
-			response.Error(c, http.StatusUnauthorized, codeUnauthorized, "会话已过期，请刷新或重新登录")
+			response.Error(c, http.StatusUnauthorized, codeUnauthorized, "Session expired. Refresh token or log in again.")
 			c.Abort()
 			return
 		}

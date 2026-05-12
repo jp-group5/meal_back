@@ -86,19 +86,19 @@ type upsertProfileRequest struct {
 func (h *AuthHandler) Register(c *gin.Context) {
 	var req registerRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, http.StatusBadRequest, codeInvalidParam, "请求参数不合法，请检查 username/email/password")
+		response.Error(c, http.StatusBadRequest, codeInvalidParam, "Invalid request payload. Please check username/email/password.")
 		return
 	}
 
 	username := normalizeUsername(req.Username)
 	if username == "" {
-		response.Error(c, http.StatusBadRequest, codeInvalidParam, "用户名不能为空")
+		response.Error(c, http.StatusBadRequest, codeInvalidParam, "Username cannot be empty.")
 		return
 	}
 
 	passwordHash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
-		response.Error(c, http.StatusInternalServerError, codeRegisterFailed, "密码加密失败")
+		response.Error(c, http.StatusInternalServerError, codeRegisterFailed, "Failed to hash password.")
 		return
 	}
 
@@ -127,13 +127,13 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	}); err != nil {
 		if isDuplicateKeyError(err) {
 			if isUsernameDuplicate(err) {
-				response.Error(c, http.StatusBadRequest, codeUsernameExists, "用户名已存在")
+				response.Error(c, http.StatusBadRequest, codeUsernameExists, "Username already exists.")
 				return
 			}
-			response.Error(c, http.StatusBadRequest, codeRegisterFailed, "邮箱已存在")
+			response.Error(c, http.StatusBadRequest, codeRegisterFailed, "Email already exists.")
 			return
 		}
-		response.Error(c, http.StatusInternalServerError, codeRegisterFailed, "注册失败")
+		response.Error(c, http.StatusInternalServerError, codeRegisterFailed, "Registration failed.")
 		return
 	}
 
@@ -152,7 +152,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 func (h *AuthHandler) Login(c *gin.Context) {
 	var req loginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, http.StatusBadRequest, codeInvalidParam, "请求参数不合法，请检查 username/password")
+		response.Error(c, http.StatusBadRequest, codeInvalidParam, "Invalid request payload. Please check username/password.")
 		return
 	}
 
@@ -160,32 +160,32 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	var user models.User
 	if err := h.db.Where("username = ?", username).First(&user).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			response.Error(c, http.StatusUnauthorized, codeLoginFailed, "用户名或密码错误")
+			response.Error(c, http.StatusUnauthorized, codeLoginFailed, "Invalid username or password.")
 			return
 		}
-		response.Error(c, http.StatusInternalServerError, codeLoginFailed, "登录失败")
+		response.Error(c, http.StatusInternalServerError, codeLoginFailed, "Login failed.")
 		return
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
-		response.Error(c, http.StatusUnauthorized, codeLoginFailed, "用户名或密码错误")
+		response.Error(c, http.StatusUnauthorized, codeLoginFailed, "Invalid username or password.")
 		return
 	}
 
 	accessToken, accessClaims, err := h.tokenService.CreateAccessToken(user.ID)
 	if err != nil {
-		response.Error(c, http.StatusInternalServerError, codeTokenIssueFailed, "访问令牌签发失败")
+		response.Error(c, http.StatusInternalServerError, codeTokenIssueFailed, "Failed to issue access token.")
 		return
 	}
 	refreshToken, refreshClaims, err := h.tokenService.CreateRefreshToken(user.ID)
 	if err != nil {
-		response.Error(c, http.StatusInternalServerError, codeTokenIssueFailed, "刷新令牌签发失败")
+		response.Error(c, http.StatusInternalServerError, codeTokenIssueFailed, "Failed to issue refresh token.")
 		return
 	}
 
 	sessionID, err := randomID(16)
 	if err != nil {
-		response.Error(c, http.StatusInternalServerError, codeTokenIssueFailed, "会话创建失败")
+		response.Error(c, http.StatusInternalServerError, codeTokenIssueFailed, "Failed to create session.")
 		return
 	}
 
@@ -201,7 +201,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		UserAgent:        truncateString(c.Request.UserAgent(), 512),
 	}
 	if err := h.db.Create(&session).Error; err != nil {
-		response.Error(c, http.StatusInternalServerError, codeLoginFailed, "登录会话保存失败")
+		response.Error(c, http.StatusInternalServerError, codeLoginFailed, "Failed to persist login session.")
 		return
 	}
 
@@ -227,37 +227,37 @@ func (h *AuthHandler) Login(c *gin.Context) {
 func (h *AuthHandler) RefreshToken(c *gin.Context) {
 	var req refreshRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, http.StatusBadRequest, codeInvalidParam, "refresh_token 不能为空")
+		response.Error(c, http.StatusBadRequest, codeInvalidParam, "refresh_token is required.")
 		return
 	}
 
 	claims, err := h.tokenService.ParseToken(strings.TrimSpace(req.RefreshToken))
 	if err != nil {
-		response.Error(c, http.StatusUnauthorized, codeAuthFailed, "无效或已过期的 refresh token")
+		response.Error(c, http.StatusUnauthorized, codeAuthFailed, "Invalid or expired refresh token.")
 		return
 	}
 	if claims.TokenType != auth.TokenTypeRefresh {
-		response.Error(c, http.StatusUnauthorized, codeAuthFailed, "token 类型错误")
+		response.Error(c, http.StatusUnauthorized, codeAuthFailed, "Invalid token type.")
 		return
 	}
 	if h.tokenBlacklist != nil && h.tokenBlacklist.IsBlacklisted(claims.ID) {
-		response.Error(c, http.StatusUnauthorized, codeAuthFailed, "refresh token 已失效")
+		response.Error(c, http.StatusUnauthorized, codeAuthFailed, "Refresh token is revoked.")
 		return
 	}
 
 	var session models.UserSession
 	if err := h.db.Where("refresh_token_jti = ? AND is_revoked = ?", claims.ID, false).First(&session).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			response.Error(c, http.StatusUnauthorized, codeAuthFailed, "会话不存在或已失效，请重新登录")
+			response.Error(c, http.StatusUnauthorized, codeAuthFailed, "Session not found or revoked. Please log in again.")
 			return
 		}
-		response.Error(c, http.StatusInternalServerError, codeAuthFailed, "刷新会话校验失败")
+		response.Error(c, http.StatusInternalServerError, codeAuthFailed, "Failed to validate refresh session.")
 		return
 	}
 
 	accessToken, accessClaims, err := h.tokenService.CreateAccessToken(claims.UserID)
 	if err != nil {
-		response.Error(c, http.StatusInternalServerError, codeTokenIssueFailed, "访问令牌签发失败")
+		response.Error(c, http.StatusInternalServerError, codeTokenIssueFailed, "Failed to issue access token.")
 		return
 	}
 
@@ -266,7 +266,7 @@ func (h *AuthHandler) RefreshToken(c *gin.Context) {
 		"access_expires_at": accessClaims.ExpiresAt.Time,
 		"last_seen_at":      time.Now(),
 	}).Error; err != nil {
-		response.Error(c, http.StatusInternalServerError, codeAuthFailed, "会话更新失败")
+		response.Error(c, http.StatusInternalServerError, codeAuthFailed, "Failed to update session.")
 		return
 	}
 
@@ -278,19 +278,19 @@ func (h *AuthHandler) RefreshToken(c *gin.Context) {
 func (h *AuthHandler) Logout(c *gin.Context) {
 	tokenJTIVal, ok := c.Get("tokenJTI")
 	if !ok {
-		response.Error(c, http.StatusUnauthorized, codeAuthFailed, "未找到 token 信息")
+		response.Error(c, http.StatusUnauthorized, codeAuthFailed, "Missing token context.")
 		return
 	}
 	expVal, ok := c.Get("tokenExpiresAt")
 	if !ok {
-		response.Error(c, http.StatusUnauthorized, codeAuthFailed, "未找到 token 过期时间")
+		response.Error(c, http.StatusUnauthorized, codeAuthFailed, "Missing token expiration context.")
 		return
 	}
 
 	tokenJTI, _ := tokenJTIVal.(string)
 	expiresAt, _ := expVal.(int64)
 	if tokenJTI == "" || expiresAt <= 0 {
-		response.Error(c, http.StatusUnauthorized, codeAuthFailed, "token 信息无效")
+		response.Error(c, http.StatusUnauthorized, codeAuthFailed, "Invalid token context.")
 		return
 	}
 
@@ -298,14 +298,14 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 	if err := h.db.Model(&models.UserSession{}).
 		Where("access_token_jti = ? AND is_revoked = ?", tokenJTI, false).
 		Updates(map[string]interface{}{"is_revoked": true, "revoked_at": now, "last_seen_at": now}).Error; err != nil {
-		response.Error(c, http.StatusInternalServerError, codeAuthFailed, "退出登录失败")
+		response.Error(c, http.StatusInternalServerError, codeAuthFailed, "Logout failed.")
 		return
 	}
 
 	if h.tokenBlacklist != nil {
 		h.tokenBlacklist.Add(tokenJTI, time.Unix(expiresAt, 0))
 	}
-	response.Success(c, http.StatusOK, gin.H{"message": "已退出登录"})
+	response.Success(c, http.StatusOK, gin.H{"message": "Logged out."})
 }
 
 // Me 返回当前登录用户信息。
@@ -313,7 +313,7 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 func (h *AuthHandler) Me(c *gin.Context) {
 	userIDVal, ok := c.Get("userID")
 	if !ok {
-		response.Error(c, http.StatusUnauthorized, codeAuthFailed, "未找到用户身份")
+		response.Error(c, http.StatusUnauthorized, codeAuthFailed, "Missing user identity in context.")
 		return
 	}
 
@@ -321,16 +321,16 @@ func (h *AuthHandler) Me(c *gin.Context) {
 	var user models.User
 	if err := h.db.Select("id", "username", "email", "created_at", "updated_at").First(&user, userID).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			response.Error(c, http.StatusNotFound, codeUserNotFound, "用户不存在")
+			response.Error(c, http.StatusNotFound, codeUserNotFound, "User not found.")
 			return
 		}
-		response.Error(c, http.StatusInternalServerError, codeUserNotFound, "查询用户信息失败")
+		response.Error(c, http.StatusInternalServerError, codeUserNotFound, "Failed to query user.")
 		return
 	}
 
 	var profile models.UserProfile
 	if err := h.db.Where("user_id = ?", userID).First(&profile).Error; err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-		response.Error(c, http.StatusInternalServerError, codeUserNotFound, "查询用户资料失败")
+		response.Error(c, http.StatusInternalServerError, codeUserNotFound, "Failed to query user profile.")
 		return
 	}
 
@@ -351,14 +351,14 @@ func (h *AuthHandler) Me(c *gin.Context) {
 func (h *AuthHandler) UpsertProfile(c *gin.Context) {
 	userIDVal, ok := c.Get("userID")
 	if !ok {
-		response.Error(c, http.StatusUnauthorized, codeAuthFailed, "未找到用户身份")
+		response.Error(c, http.StatusUnauthorized, codeAuthFailed, "Missing user identity in context.")
 		return
 	}
 	userID, _ := userIDVal.(uint)
 
 	var req upsertProfileRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, http.StatusBadRequest, codeInvalidParam, "请求参数不合法，请检查资料字段")
+		response.Error(c, http.StatusBadRequest, codeInvalidParam, "Invalid request payload. Please check profile fields.")
 		return
 	}
 
@@ -373,7 +373,7 @@ func (h *AuthHandler) UpsertProfile(c *gin.Context) {
 	budgetProvided := req.MonthlyFoodBudget != nil || req.MonthlyFoodBudgetCamel != nil || req.MonthlyDietBudget != nil
 
 	if !heightProvided && !weightProvided && !trainingProvided && !goalProvided && !budgetProvided {
-		response.Error(c, http.StatusBadRequest, codeInvalidParam, "至少需要提供一个可更新字段")
+		response.Error(c, http.StatusBadRequest, codeInvalidParam, "Provide at least one updatable field.")
 		return
 	}
 
@@ -382,7 +382,7 @@ func (h *AuthHandler) UpsertProfile(c *gin.Context) {
 	if heightProvided {
 		height := firstNonNilFloat64(req.HeightCM, req.HeightCm)
 		if height == nil || *height < 80 || *height > 260 {
-			response.Error(c, http.StatusBadRequest, codeInvalidParam, "身高范围需在 80-260 cm")
+			response.Error(c, http.StatusBadRequest, codeInvalidParam, "height_cm must be between 80 and 260.")
 			return
 		}
 		updates["height_cm"] = *height
@@ -391,7 +391,7 @@ func (h *AuthHandler) UpsertProfile(c *gin.Context) {
 	if weightProvided {
 		weight := firstNonNilFloat64(req.WeightKG, req.WeightKg)
 		if weight == nil || *weight < 20 || *weight > 300 {
-			response.Error(c, http.StatusBadRequest, codeInvalidParam, "体重范围需在 20-300 kg")
+			response.Error(c, http.StatusBadRequest, codeInvalidParam, "weight_kg must be between 20 and 300.")
 			return
 		}
 		updates["weight_kg"] = *weight
@@ -412,7 +412,7 @@ func (h *AuthHandler) UpsertProfile(c *gin.Context) {
 			return
 		}
 		if len(trainings) == 0 {
-			response.Error(c, http.StatusBadRequest, codeInvalidParam, "请至少选择一项运动经验")
+			response.Error(c, http.StatusBadRequest, codeInvalidParam, "At least one training experience is required.")
 			return
 		}
 		updates["exercise_experience"] = strings.Join(trainings, ",")
@@ -421,7 +421,7 @@ func (h *AuthHandler) UpsertProfile(c *gin.Context) {
 	if goalProvided {
 		goal, ok := normalizeFitnessGoal(goalRaw)
 		if !ok {
-			response.Error(c, http.StatusBadRequest, codeInvalidParam, "目标仅支持 减重/增肌/维持身材")
+			response.Error(c, http.StatusBadRequest, codeInvalidParam, "fitness_goal must be one of lose_weight/build_muscle/maintain_shape.")
 			return
 		}
 		updates["fitness_goal"] = goal
@@ -430,31 +430,31 @@ func (h *AuthHandler) UpsertProfile(c *gin.Context) {
 	if budgetProvided {
 		budget := firstNonNilInt64(req.MonthlyFoodBudget, req.MonthlyFoodBudgetCamel, req.MonthlyDietBudget)
 		if budget == nil || *budget < 100 {
-			response.Error(c, http.StatusBadRequest, codeInvalidParam, "每月饮食费上限至少为 100")
+			response.Error(c, http.StatusBadRequest, codeInvalidParam, "monthly_food_budget must be at least 100.")
 			return
 		}
 		updates["monthly_diet_budget"] = *budget
 	}
 
 	if err := h.db.Where("user_id = ?", userID).FirstOrCreate(&models.UserProfile{UserID: userID}).Error; err != nil {
-		response.Error(c, http.StatusInternalServerError, codeUserNotFound, "初始化用户资料失败")
+		response.Error(c, http.StatusInternalServerError, codeUserNotFound, "Failed to initialize user profile.")
 		return
 	}
 
 	if err := h.db.Model(&models.UserProfile{}).Where("user_id = ?", userID).Updates(updates).Error; err != nil {
-		response.Error(c, http.StatusInternalServerError, codeUserNotFound, "保存用户资料失败")
+		response.Error(c, http.StatusInternalServerError, codeUserNotFound, "Failed to save user profile.")
 		return
 	}
 
 	var user models.User
 	if err := h.db.Select("id", "username", "email", "created_at", "updated_at").First(&user, userID).Error; err != nil {
-		response.Error(c, http.StatusInternalServerError, codeUserNotFound, "查询用户信息失败")
+		response.Error(c, http.StatusInternalServerError, codeUserNotFound, "Failed to query user.")
 		return
 	}
 
 	var profile models.UserProfile
 	if err := h.db.Where("user_id = ?", userID).First(&profile).Error; err != nil {
-		response.Error(c, http.StatusInternalServerError, codeUserNotFound, "查询用户资料失败")
+		response.Error(c, http.StatusInternalServerError, codeUserNotFound, "Failed to query user profile.")
 		return
 	}
 
@@ -516,6 +516,8 @@ func buildUserPayload(user models.User, profile *models.UserProfile) gin.H {
 		"bio":                 profile.Bio,
 		"height_cm":           profile.HeightCM,
 		"weight_kg":           profile.WeightKG,
+		"allergies":           profile.Allergies,
+		"dietary_preferences": profile.DietaryPreferences,
 		"exercise_experience": profile.ExerciseExperience,
 		"training_experience": trainingExperience,
 		"fitness_goal":        profile.FitnessGoal,
@@ -525,6 +527,8 @@ func buildUserPayload(user models.User, profile *models.UserProfile) gin.H {
 
 	payload["height_cm"] = profile.HeightCM
 	payload["weight_kg"] = profile.WeightKG
+	payload["allergies"] = profile.Allergies
+	payload["dietary_preferences"] = profile.DietaryPreferences
 	payload["exercise_experience"] = profile.ExerciseExperience
 	payload["training_experience"] = trainingExperience
 	payload["fitness_goal"] = profile.FitnessGoal
@@ -575,7 +579,7 @@ func normalizeTrainingExperience(values []string) ([]string, error) {
 		for _, part := range parts {
 			normalized, ok := normalizeTrainingToken(part)
 			if !ok {
-				return nil, errors.New("运动经验仅支持：健身、瑜伽、普拉提、攀岩")
+				return nil, errors.New("training_experience must be one of fitness/yoga/pilates/climbing.")
 			}
 			if _, exists := seen[normalized]; exists {
 				continue
@@ -591,13 +595,13 @@ func normalizeTrainingExperience(values []string) ([]string, error) {
 func normalizeTrainingToken(raw string) (string, bool) {
 	token := strings.ToLower(strings.TrimSpace(raw))
 	switch token {
-	case "fitness", "健身":
+	case "fitness":
 		return "fitness", true
-	case "yoga", "瑜伽":
+	case "yoga":
 		return "yoga", true
-	case "pilates", "普拉提":
+	case "pilates":
 		return "pilates", true
-	case "climbing", "攀岩":
+	case "climbing":
 		return "climbing", true
 	default:
 		return "", false
@@ -607,11 +611,11 @@ func normalizeTrainingToken(raw string) (string, bool) {
 func normalizeFitnessGoal(raw string) (string, bool) {
 	token := strings.ToLower(strings.TrimSpace(raw))
 	switch token {
-	case "lose_weight", "减重":
+	case "lose_weight":
 		return "lose_weight", true
-	case "build_muscle", "增肌":
+	case "build_muscle":
 		return "build_muscle", true
-	case "maintain_shape", "维持身材":
+	case "maintain_shape":
 		return "maintain_shape", true
 	default:
 		return "", false
