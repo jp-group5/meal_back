@@ -91,16 +91,15 @@ func (h *NutritionHandler) UpsertPreferences(c *gin.Context) {
 		dietaryPreferences = normalizeStringList(req.DietaryPreferencesAlt)
 	}
 
-	if err := h.db.Where("user_id = ?", userID).FirstOrCreate(&models.UserProfile{UserID: userID}).Error; err != nil {
+	var profile models.UserProfile
+	if err := h.db.Where("user_id = ?", userID).FirstOrCreate(&profile, models.UserProfile{UserID: userID}).Error; err != nil {
 		response.Error(c, http.StatusInternalServerError, codeNutritionDBError, "Failed to initialize user profile.")
 		return
 	}
 
-	updates := map[string]interface{}{
-		"allergies":           allergies,
-		"dietary_preferences": dietaryPreferences,
-	}
-	if err := h.db.Model(&models.UserProfile{}).Where("user_id = ?", userID).Updates(updates).Error; err != nil {
+	profile.Allergies = allergies
+	profile.DietaryPreferences = dietaryPreferences
+	if err := h.db.Save(&profile).Error; err != nil {
 		response.Error(c, http.StatusInternalServerError, codeNutritionDBError, "Failed to save user preferences.")
 		return
 	}
@@ -110,7 +109,6 @@ func (h *NutritionHandler) UpsertPreferences(c *gin.Context) {
 		response.Error(c, http.StatusInternalServerError, codeNutritionDBError, "Failed to query user.")
 		return
 	}
-	var profile models.UserProfile
 	if err := h.db.Where("user_id = ?", userID).First(&profile).Error; err != nil {
 		response.Error(c, http.StatusInternalServerError, codeNutritionDBError, "Failed to query user profile.")
 		return
