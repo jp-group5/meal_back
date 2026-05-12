@@ -9,7 +9,7 @@ type TotalNutrition struct {
 	Protein          float64 `json:"protein"`
 	Fat              float64 `json:"fat"`
 	Carbohydrates    float64 `json:"carbohydrates"`
-	VegetablesAmount string  `json:"vegetables_amount"`
+	VegetablesAmount float64  `json:"vegetables"`
 }
 
 type MealAnalysisResponse struct {

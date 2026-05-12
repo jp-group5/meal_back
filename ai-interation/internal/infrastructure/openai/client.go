@@ -48,12 +48,34 @@ type responseRequest struct {
 }
 
 type responseAPIResponse struct {
-	OutputText string `json:"output_text"`
-	Usage      struct {
+	Output []struct {
+		Type    string `json:"type"`
+		Role    string `json:"role"`
+		Content []struct {
+			Type string `json:"type"`
+			Text string `json:"text"`
+		} `json:"content"`
+	} `json:"output"`
+	Usage struct {
 		InputTokens  int `json:"input_tokens"`
 		OutputTokens int `json:"output_tokens"`
 		TotalTokens  int `json:"total_tokens"`
 	} `json:"usage"`
+}
+
+func extractOutputText(resp responseAPIResponse) string {
+	var parts []string
+	for _, item := range resp.Output {
+		if item.Type != "message" {
+			continue
+		}
+		for _, c := range item.Content {
+			if c.Type == "output_text" && strings.TrimSpace(c.Text) != "" {
+				parts = append(parts, c.Text)
+			}
+		}
+	}
+	return strings.Join(parts, "")
 }
 
 func (c *Client) AnalyzeMeal(ctx context.Context, imageBytes []byte) (string, error) {
@@ -80,9 +102,9 @@ func (c *Client) AnalyzeMeal(ctx context.Context, imageBytes []byte) (string, er
 					"protein":           map[string]any{"type": "number"},
 					"fat":               map[string]any{"type": "number"},
 					"carbohydrates":     map[string]any{"type": "number"},
-					"vegetables_amount": map[string]any{"type": "string"},
+					"vegetables": map[string]any{"type": "number"},
 				},
-				"required": []string{"calories", "protein", "fat", "carbohydrates", "vegetables_amount"},
+				"required": []string{"calories", "protein", "fat", "carbohydrates", "vegetables"},
 				"additionalProperties": false,
 			},
 			"error": map[string]any{"type": "null"},
@@ -99,7 +121,7 @@ func (c *Client) AnalyzeMeal(ctx context.Context, imageBytes []byte) (string, er
 				"content": []any{
 					map[string]any{
 						"type": "input_text",
-						"text": "この画像の食事を解析し、献立名と栄養成分をJSONで返してください。",
+						"text": "この画像の食事を解析し、献立名と栄養成分をJSONで返してください。単位はcalories:kcal、protein,fat,carbohydrates,vegetables:gです。",
 					},
 					map[string]any{
 						"type":      "input_image",
@@ -190,6 +212,13 @@ func (c *Client) callResponsesAPI(ctx context.Context, payload any) (string, err
 		return "", err
 	}
 
+	rawText := extractOutputText(out)
+	fmt.Printf("[OpenAI raw output] %q\n", rawText)
+
+	if strings.TrimSpace(rawText) == "" {
+		return "", fmt.Errorf("openai returned empty output text")
+	}
+
 	fmt.Printf(
 		"[OpenAI usage] input=%d output=%d total=%d\n",
 		out.Usage.InputTokens,
@@ -197,7 +226,7 @@ func (c *Client) callResponsesAPI(ctx context.Context, payload any) (string, err
 		out.Usage.TotalTokens,
 	)
 
-	return out.OutputText, nil
+	return rawText, nil
 }
 
 var _ port.AIClient = (*Client)(nil)

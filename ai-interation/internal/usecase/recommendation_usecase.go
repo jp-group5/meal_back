@@ -106,6 +106,8 @@ func (u *RecommendationUsecase) Generate(ctx context.Context, req dto.Recommenda
 - health_goal に沿う
 - recent な dietary_history を優先して偏りを避ける
 - dietary_history の days_ago は 0 が当日、1 が前日、2 が2日前
+- menu_name及びreasonは日本語で返す
+- reasonは50文字以下
 
 データ:
 %s

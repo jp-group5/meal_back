@@ -26,7 +26,7 @@ func (m *AIClientMock) AnalyzeMeal(ctx context.Context, imageBytes []byte, filen
 			Protein:         27.4,
 			Fat:             10.8,
 			Carbohydrates:   62.0,
-			VegetablesAmount: "40g",
+			VegetablesAmount: 40.0,
 		},
 		Error: nil,
 	}
