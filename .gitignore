@@ -9,3 +9,5 @@ coverage/
 *.swo
 *.tmp
 docs/*.local.md
+scripts/local/
+json/
