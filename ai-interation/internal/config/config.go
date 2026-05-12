@@ -3,9 +3,7 @@ package config
 import "os"
 
 type Config struct {
-	Port         string
-	OpenAIAPIKey string
-	OpenAIModel  string
+	Port string
 }
 
 func Load() Config {
@@ -15,15 +13,5 @@ func Load() Config {
 	} else if port[0] != ':' {
 		port = ":" + port
 	}
-
-	model := os.Getenv("OPENAI_MODEL")
-	if model == "" {
-		model = "gpt-4o-mini"
-	}
-
-	return Config{
-		Port:         port,
-		OpenAIAPIKey: os.Getenv("OPENAI_API_KEY"),
-		OpenAIModel:  model,
-	}
+	return Config{Port: port}
 }

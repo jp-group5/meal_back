@@ -18,7 +18,7 @@ func NewMealAnalysisHandler(u *usecase.MealAnalysisUsecase) *MealAnalysisHandler
 }
 
 func (h *MealAnalysisHandler) Analyze(c *gin.Context) {
-	file, header, err := c.Request.FormFile("image")
+	file, _, err := c.Request.FormFile("image")
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "image is required"})
 		return
@@ -31,7 +31,7 @@ func (h *MealAnalysisHandler) Analyze(c *gin.Context) {
 		return
 	}
 
-	res, err := h.usecase.Analyze(c.Request.Context(), imageBytes, header.Filename)
+	res, err := h.usecase.Analyze(c.Request.Context(), imageBytes)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

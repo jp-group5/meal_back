@@ -35,20 +35,13 @@ func NewClientFromEnv() (*Client, error) {
 	return &Client{
 		apiKey: apiKey,
 		model:  model,
-		httpClient: &http.Client{
-			Timeout: 60 * time.Second,
-		},
+		httpClient: &http.Client{Timeout: 60 * time.Second},
 	}, nil
 }
 
-type responseRequest struct {
-	Model string `json:"model"`
-	Input any    `json:"input"`
-	Text  any    `json:"text,omitempty"`
-}
-
 type responseAPIResponse struct {
-	Output []struct {
+	OutputText string `json:"output_text"`
+	Output     []struct {
 		Type    string `json:"type"`
 		Role    string `json:"role"`
 		Content []struct {
@@ -63,78 +56,46 @@ type responseAPIResponse struct {
 	} `json:"usage"`
 }
 
-func extractOutputText(resp responseAPIResponse) string {
-	var parts []string
-	for _, item := range resp.Output {
-		if item.Type != "message" {
-			continue
-		}
-		for _, c := range item.Content {
-			if c.Type == "output_text" && strings.TrimSpace(c.Text) != "" {
-				parts = append(parts, c.Text)
-			}
-		}
-	}
-	return strings.Join(parts, "")
-}
-
 func (c *Client) AnalyzeMeal(ctx context.Context, imageBytes []byte) (string, error) {
-	dataURL := "data:image/jpeg;base64," + base64.StdEncoding.EncodeToString(imageBytes)
-
 	schema := map[string]any{
 		"type": "object",
 		"properties": map[string]any{
-			"items": map[string]any{
+			"date": map[string]any{"type": "string"},
+			"content": map[string]any{
 				"type": "array",
-				"items": map[string]any{
-					"type": "object",
-					"properties": map[string]any{
-						"name": map[string]any{"type": "string"},
-					},
-					"required": []string{"name"},
-					"additionalProperties": false,
-				},
+				"items": map[string]any{"type": "string"},
 			},
-			"total_nutrition": map[string]any{
-				"type": "object",
-				"properties": map[string]any{
-					"calories":          map[string]any{"type": "number"},
-					"protein":           map[string]any{"type": "number"},
-					"fat":               map[string]any{"type": "number"},
-					"carbohydrates":     map[string]any{"type": "number"},
-					"vegetables": map[string]any{"type": "number"},
-				},
-				"required": []string{"calories", "protein", "fat", "carbohydrates", "vegetables"},
-				"additionalProperties": false,
-			},
-			"error": map[string]any{"type": "null"},
+			"calories": map[string]any{"type": "number"},
+			"protein":  map[string]any{"type": "number"},
+			"fat":      map[string]any{"type": "number"},
+			"carbs":    map[string]any{"type": "number"},
 		},
-		"required": []string{"items", "total_nutrition", "error"},
+		"required": []string{"date", "content", "calories", "protein", "fat", "carbs"},
 		"additionalProperties": false,
 	}
 
-	body := responseRequest{
-		Model: c.model,
-		Input: []any{
+	body := map[string]any{
+		"model": c.model,
+		"input": []any{
 			map[string]any{
 				"role": "user",
 				"content": []any{
 					map[string]any{
 						"type": "input_text",
-						"text": "この画像の食事を解析し、献立名と栄養成分をJSONで返してください。単位はcalories:kcal、protein,fat,carbohydrates,vegetables:gです。",
+						"text": "食事画像を解析し、献立名と栄養成分をJSONだけで返してください。",
 					},
 					map[string]any{
 						"type":      "input_image",
-						"image_url":  dataURL,
-						"detail":     "high",
+						"image_url": "data:image/jpeg;base64," + base64.StdEncoding.EncodeToString(imageBytes),
+						"detail":    "high",
 					},
 				},
 			},
 		},
-		Text: map[string]any{
+		"text": map[string]any{
 			"format": map[string]any{
-				"type": "json_schema",
-				"name": "meal_analysis",
+				"type":   "json_schema",
+				"name":   "meal_analysis",
 				"schema": schema,
 				"strict": true,
 			},
@@ -154,9 +115,13 @@ func (c *Client) GenerateRecommendation(ctx context.Context, prompt string) (str
 					"type": "object",
 					"properties": map[string]any{
 						"menu_name": map[string]any{"type": "string"},
+						"calories":  map[string]any{"type": "number"},
+						"protein":   map[string]any{"type": "number"},
+						"fat":       map[string]any{"type": "number"},
+						"carbs":     map[string]any{"type": "number"},
 						"reason":    map[string]any{"type": "string"},
 					},
-					"required": []string{"menu_name", "reason"},
+					"required": []string{"menu_name", "calories", "protein", "fat", "carbs", "reason"},
 					"additionalProperties": false,
 				},
 			},
@@ -166,13 +131,23 @@ func (c *Client) GenerateRecommendation(ctx context.Context, prompt string) (str
 		"additionalProperties": false,
 	}
 
-	body := responseRequest{
-		Model: c.model,
-		Input: prompt,
-		Text: map[string]any{
+	body := map[string]any{
+		"model": c.model,
+		"input": []any{
+			map[string]any{
+				"role": "user",
+				"content": []any{
+					map[string]any{
+						"type": "input_text",
+						"text": prompt,
+					},
+				},
+			},
+		},
+		"text": map[string]any{
 			"format": map[string]any{
-				"type": "json_schema",
-				"name": "recommendation",
+				"type":   "json_schema",
+				"name":   "recommendation",
 				"schema": schema,
 				"strict": true,
 			},
@@ -212,21 +187,30 @@ func (c *Client) callResponsesAPI(ctx context.Context, payload any) (string, err
 		return "", err
 	}
 
-	rawText := extractOutputText(out)
-	fmt.Printf("[OpenAI raw output] %q\n", rawText)
-
-	if strings.TrimSpace(rawText) == "" {
-		return "", fmt.Errorf("openai returned empty output text")
+	raw := extractOutputText(out)
+	if strings.TrimSpace(raw) == "" {
+		return "", errors.New("openai returned empty output text")
 	}
 
-	fmt.Printf(
-		"[OpenAI usage] input=%d output=%d total=%d\n",
-		out.Usage.InputTokens,
-		out.Usage.OutputTokens,
-		out.Usage.TotalTokens,
-	)
+	fmt.Printf("[OpenAI usage] input=%d output=%d total=%d\n", out.Usage.InputTokens, out.Usage.OutputTokens, out.Usage.TotalTokens)
 
-	return rawText, nil
+	return raw, nil
+}
+
+func extractOutputText(out responseAPIResponse) string {
+	if strings.TrimSpace(out.OutputText) != "" {
+		return out.OutputText
+	}
+
+	var parts []string
+	for _, item := range out.Output {
+		for _, c := range item.Content {
+			if strings.TrimSpace(c.Text) != "" {
+				parts = append(parts, c.Text)
+			}
+		}
+	}
+	return strings.Join(parts, "")
 }
 
 var _ port.AIClient = (*Client)(nil)

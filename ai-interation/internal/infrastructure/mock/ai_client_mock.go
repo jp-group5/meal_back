@@ -1,11 +1,6 @@
 package mock
 
-import (
-	"context"
-	"encoding/json"
-
-	"ai-interation/internal/dto"
-)
+import "context"
 
 type AIClientMock struct{}
 
@@ -13,53 +8,46 @@ func NewAIClientMock() *AIClientMock {
 	return &AIClientMock{}
 }
 
-func (m *AIClientMock) AnalyzeMeal(ctx context.Context, imageBytes []byte, filename string) (string, error) {
-	resp := dto.MealAnalysisResponse{
-		Items: []dto.MealItem{
-			{Name: "焼き鮭"},
-			{Name: "みそ汁"},
-			{Name: "漬物"},
-			{Name: "白米"},
-		},
-		TotalNutrition: dto.TotalNutrition{
-			Calories:        490,
-			Protein:         27.4,
-			Fat:             10.8,
-			Carbohydrates:   62.0,
-			VegetablesAmount: 40.0,
-		},
-		Error: nil,
-	}
-
-	b, err := json.Marshal(resp)
-	if err != nil {
-		return "", err
-	}
-	return string(b), nil
+func (a *AIClientMock) AnalyzeMeal(ctx context.Context, imageBytes []byte) (string, error) {
+	return `{
+		"date": "2026-04-28",
+		"content": ["焼き鮭", "みそ汁", "漬物", "白米"],
+		"calories": 490,
+		"protein": 27.4,
+		"fat": 10.8,
+		"carbs": 62.0,
+		"error": null
+	}`, nil
 }
 
-func (m *AIClientMock) GenerateRecommendations(ctx context.Context, prompt string) (string, error) {
-	resp := dto.RecommendationResponse{
-		Recommendations: []dto.RecommendationItem{
+func (a *AIClientMock) GenerateRecommendation(ctx context.Context, prompt string) (string, error) {
+	return `{
+		"recommendations": [
 			{
-				MenuName: "鶏むね肉のサラダ定食",
-				Reason:   "たんぱく質を確保しつつ、脂質を抑えやすいため",
+				"menu_name": "鶏むね肉のサラダ定食",
+				"calories": 520,
+				"protein": 42.0,
+				"fat": 18.0,
+				"carbs": 28.0,
+				"reason": "たんぱく質を確保しつつ、脂質を抑えやすいため"
 			},
 			{
-				MenuName: "鮭と野菜の蒸し料理",
-				Reason:   "野菜量を増やしやすく、栄養バランスを整えやすいため",
+				"menu_name": "鮭と野菜の蒸し料理",
+				"calories": 460,
+				"protein": 31.0,
+				"fat": 14.0,
+				"carbs": 35.0,
+				"reason": "野菜量を増やしやすく、栄養バランスを整えやすいため"
 			},
 			{
-				MenuName: "豆腐と野菜のうどん",
-				Reason:   "消化しやすく、簡単に用意できるため",
-			},
-		},
-		Error: nil,
-	}
-
-	b, err := json.Marshal(resp)
-	if err != nil {
-		return "", err
-	}
-	return string(b), nil
+				"menu_name": "豆腐と野菜のうどん",
+				"calories": 410,
+				"protein": 18.0,
+				"fat": 9.0,
+				"carbs": 58.0,
+				"reason": "消化しやすく、簡単に用意できるため"
+			}
+		],
+		"error": null
+	}`, nil
 }
