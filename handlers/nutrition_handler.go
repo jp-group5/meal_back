@@ -617,48 +617,88 @@ func buildRecommendationFromPrompt(targetDate time.Time, promptData *recommendat
 	activity := promptData.Context.ActivityIntensityStat
 	highIntensityCount := activity["high"]
 
-	title := "Daily Nutrition Recommendation"
-	reason := "This plan is generated from your profile, recent meal records, and this week's activities."
+	baseTitle := "Daily Nutrition Recommendation"
+	baseReason := "These options are generated from your profile, recent meal records, and this week's activities."
 
 	switch goal {
 	case "lose_weight":
-		title = "Fat Loss Nutrition Plan"
-		reason = "Your goal is fat loss, so prioritize high protein, fiber-rich vegetables, and controlled refined carbs."
+		baseTitle = "Fat Loss Nutrition Options"
+		baseReason = "Your goal is fat loss, so these options prioritize protein, fiber, and controlled refined carbs."
 	case "build_muscle":
-		title = "Muscle Gain Recovery Plan"
-		reason = "Your goal is muscle gain, so increase quality protein and complex carbs on training days."
+		baseTitle = "Muscle Gain Nutrition Options"
+		baseReason = "Your goal is muscle gain, so these options increase quality protein and complex carbs around training."
 	case "maintain_shape":
-		title = "Body Maintenance Plan"
-		reason = "Your goal is maintenance, so keep energy intake stable and meals consistent."
+		baseTitle = "Body Maintenance Nutrition Options"
+		baseReason = "Your goal is maintenance, so these options keep intake stable and meals consistent."
 	}
 
 	if highIntensityCount >= 2 {
-		reason += " You had multiple high-intensity sessions this week, so add moderate dinner carbs and electrolytes."
+		baseReason += " You had multiple high-intensity sessions this week, so moderate carb replenishment is included."
 	}
 	if avgCalories > 0 && avgCalories < 1400 {
-		reason += " Your recent average calories are low, so avoid prolonged under-fueling."
+		baseReason += " Recent average calories are low, so options avoid prolonged under-fueling."
 	}
 
-	suggestedMeals := []gin.H{
-		{"type": "breakfast", "content": "Greek yogurt oatmeal bowl + boiled egg + berries"},
-		{"type": "lunch", "content": "Chicken and brown rice salad bowl + avocado"},
-		{"type": "dinner", "content": "Steamed fish + broccoli + sweet potato"},
+	options := []gin.H{
+		{
+			"optionId": "plan-a",
+			"title":    "Option A - Balanced Performance",
+			"reason":   baseReason + " This option balances satiety and recovery.",
+			"suggestedMeals": []gin.H{
+				{"type": "breakfast", "content": "Greek yogurt oatmeal bowl + boiled egg + berries"},
+				{"type": "lunch", "content": "Chicken and brown rice salad bowl + avocado"},
+				{"type": "dinner", "content": "Steamed fish + broccoli + sweet potato"},
+			},
+		},
+		{
+			"optionId": "plan-b",
+			"title":    "Option B - Higher Protein",
+			"reason":   baseReason + " This option increases protein density across all meals.",
+			"suggestedMeals": []gin.H{
+				{"type": "breakfast", "content": "Egg white omelet + cottage cheese + apple"},
+				{"type": "lunch", "content": "Turkey quinoa bowl + mixed greens"},
+				{"type": "dinner", "content": "Grilled salmon + asparagus + lentils"},
+			},
+		},
+		{
+			"optionId": "plan-c",
+			"title":    "Option C - Quick Prep",
+			"reason":   baseReason + " This option is designed for lower preparation time.",
+			"suggestedMeals": []gin.H{
+				{"type": "breakfast", "content": "Protein smoothie + banana + peanut-free granola"},
+				{"type": "lunch", "content": "Tuna whole-grain wrap + side salad"},
+				{"type": "dinner", "content": "Tofu stir-fry + microwave brown rice + vegetables"},
+			},
+		},
 	}
 
-	// If dietary preference exists, lightly adjust the first suggestion.
 	if len(promptData.User.DietaryPreferences) > 0 {
 		pref := promptData.User.DietaryPreferences[0]
-		suggestedMeals[0]["content"] = fmt.Sprintf("Preference-based (%s): soy milk + whole-grain toast + mixed nuts", pref)
+		for idx := range options {
+			meals, ok := options[idx]["suggestedMeals"].([]gin.H)
+			if !ok || len(meals) == 0 {
+				continue
+			}
+			meals[0]["content"] = fmt.Sprintf("Preference-based (%s): soy milk + whole-grain toast + mixed nuts", pref)
+			options[idx]["suggestedMeals"] = meals
+		}
 	}
 
+	primary := options[0]
+	recommendationID := fmt.Sprintf("rec-%d", time.Now().Unix())
+
 	return gin.H{
-		"date":             targetDate.Format(dateLayout),
-		"title":            title,
-		"reason":           reason,
-		"suggestedMeals":   suggestedMeals,
-		"prompt_json":      promptData,
-		"prompt_version":   "v1",
-		"recommendationId": fmt.Sprintf("rec-%d", time.Now().Unix()),
+		"date":               targetDate.Format(dateLayout),
+		"title":              baseTitle,
+		"default_choice":     primary["title"],
+		"reason":             primary["reason"],
+		"suggestedMeals":     primary["suggestedMeals"],
+		"recommendationId":   recommendationID,
+		"choice_count":       len(options),
+		"choices":            options,
+		"selection_guidance": "Choose one option based on your schedule, appetite, and meal preparation time.",
+		"prompt_json":        promptData,
+		"prompt_version":     "v2",
 	}
 }
 

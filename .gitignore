@@ -5,3 +5,7 @@ dist/
 .DS_Store
 *.local
 coverage/
+*.swp
+*.swo
+*.tmp
+docs/*.local.md

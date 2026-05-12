@@ -103,7 +103,70 @@ All endpoints above require `Authorization: Bearer <access_token>`.
 }
 ```
 
-## 6. Reusable AI Task Template
+## 6. Runtime Prompt Example (Directly for AI)
+Use this when calling the model with `prompt_json`.
+
+```text
+[System]
+You are a nutrition recommendation assistant.
+Use only the provided JSON context.
+Do not provide medical diagnosis.
+Strictly avoid listed allergies and respect dietary preferences.
+Return valid JSON only.
+
+Required output schema:
+{
+  "date": "YYYY-MM-DD",
+  "choices": [
+    {
+      "title": "string",
+      "reason": "string",
+      "suggestedMeals": [
+        {"type":"breakfast|lunch|dinner|snack","content":"string"}
+      ]
+    }
+  ]
+}
+
+Rules:
+- Return 2 to 4 choices.
+- Each choice must include breakfast, lunch, and dinner.
+- Keep reason concise and practical.
+
+[User]
+Here is the context JSON:
+{{prompt_json}}
+```
+
+Example model output:
+
+```json
+{
+  "date": "2026-05-12",
+  "choices": [
+    {
+      "title": "Option A - Balanced Performance",
+      "reason": "Balanced calories and protein for recovery with moderate carbs.",
+      "suggestedMeals": [
+        {"type": "breakfast", "content": "Greek yogurt oatmeal bowl + boiled egg + berries"},
+        {"type": "lunch", "content": "Chicken and brown rice salad bowl + avocado"},
+        {"type": "dinner", "content": "Steamed fish + broccoli + sweet potato"}
+      ]
+    },
+    {
+      "title": "Option B - Higher Protein",
+      "reason": "Higher protein density to support muscle recovery and satiety.",
+      "suggestedMeals": [
+        {"type": "breakfast", "content": "Egg white omelet + cottage cheese + apple"},
+        {"type": "lunch", "content": "Turkey quinoa bowl + mixed greens"},
+        {"type": "dinner", "content": "Grilled salmon + asparagus + lentils"}
+      ]
+    }
+  ]
+}
+```
+
+## 7. Reusable AI Task Template
 ```text
 You are my Go backend copilot for meal_app. Please do the following:
 1) Keep API compatibility with frontend endpoints: /meals, /activities, /recommendations, /users/me/preferences.
@@ -113,7 +176,7 @@ You are my Go backend copilot for meal_app. Please do the following:
 5) Return changed file list, key schema/field updates, and minimal integration test steps.
 ```
 
-## 7. Minimal Integration Steps
+## 8. Minimal Integration Steps
 1. Set env vars: `DB_DSN`, `JWT_SECRET`.
 2. Start backend (default `:8080`).
 3. Point frontend `VITE_API_BASE_URL` to `http://localhost:8080/api/v1`.
