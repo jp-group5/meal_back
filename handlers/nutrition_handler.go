@@ -75,13 +75,13 @@ type recommendationRequest struct {
 func (h *NutritionHandler) UpsertPreferences(c *gin.Context) {
 	userID, ok := getUserIDFromContext(c)
 	if !ok {
-		response.Error(c, http.StatusUnauthorized, codeAuthFailed, "未找到用户身份")
+		response.Error(c, http.StatusUnauthorized, codeAuthFailed, "Missing user identity in context.")
 		return
 	}
 
 	var req upsertPreferencesRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, http.StatusBadRequest, codeNutritionInvalidParam, "请求参数不合法")
+		response.Error(c, http.StatusBadRequest, codeNutritionInvalidParam, "Invalid request payload.")
 		return
 	}
 
@@ -92,7 +92,7 @@ func (h *NutritionHandler) UpsertPreferences(c *gin.Context) {
 	}
 
 	if err := h.db.Where("user_id = ?", userID).FirstOrCreate(&models.UserProfile{UserID: userID}).Error; err != nil {
-		response.Error(c, http.StatusInternalServerError, codeNutritionDBError, "初始化用户资料失败")
+		response.Error(c, http.StatusInternalServerError, codeNutritionDBError, "Failed to initialize user profile.")
 		return
 	}
 
@@ -101,18 +101,18 @@ func (h *NutritionHandler) UpsertPreferences(c *gin.Context) {
 		"dietary_preferences": dietaryPreferences,
 	}
 	if err := h.db.Model(&models.UserProfile{}).Where("user_id = ?", userID).Updates(updates).Error; err != nil {
-		response.Error(c, http.StatusInternalServerError, codeNutritionDBError, "保存用户偏好失败")
+		response.Error(c, http.StatusInternalServerError, codeNutritionDBError, "Failed to save user preferences.")
 		return
 	}
 
 	var user models.User
 	if err := h.db.Select("id", "username", "email", "created_at", "updated_at").First(&user, userID).Error; err != nil {
-		response.Error(c, http.StatusInternalServerError, codeNutritionDBError, "查询用户失败")
+		response.Error(c, http.StatusInternalServerError, codeNutritionDBError, "Failed to query user.")
 		return
 	}
 	var profile models.UserProfile
 	if err := h.db.Where("user_id = ?", userID).First(&profile).Error; err != nil {
-		response.Error(c, http.StatusInternalServerError, codeNutritionDBError, "查询用户资料失败")
+		response.Error(c, http.StatusInternalServerError, codeNutritionDBError, "Failed to query user profile.")
 		return
 	}
 
@@ -122,7 +122,7 @@ func (h *NutritionHandler) UpsertPreferences(c *gin.Context) {
 func (h *NutritionHandler) GetMealsByDate(c *gin.Context) {
 	userID, ok := getUserIDFromContext(c)
 	if !ok {
-		response.Error(c, http.StatusUnauthorized, codeAuthFailed, "未找到用户身份")
+		response.Error(c, http.StatusUnauthorized, codeAuthFailed, "Missing user identity in context.")
 		return
 	}
 
@@ -138,7 +138,7 @@ func (h *NutritionHandler) GetMealsByDate(c *gin.Context) {
 		Where("user_id = ? AND date = ?", userID, day.Format(dateLayout)).
 		Order("created_at DESC").
 		Find(&records).Error; err != nil {
-		response.Error(c, http.StatusInternalServerError, codeNutritionDBError, "查询饮食记录失败")
+		response.Error(c, http.StatusInternalServerError, codeNutritionDBError, "Failed to query meal records.")
 		return
 	}
 
@@ -152,13 +152,13 @@ func (h *NutritionHandler) GetMealsByDate(c *gin.Context) {
 func (h *NutritionHandler) CreateMeal(c *gin.Context) {
 	userID, ok := getUserIDFromContext(c)
 	if !ok {
-		response.Error(c, http.StatusUnauthorized, codeAuthFailed, "未找到用户身份")
+		response.Error(c, http.StatusUnauthorized, codeAuthFailed, "Missing user identity in context.")
 		return
 	}
 
 	var req mealRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, http.StatusBadRequest, codeNutritionInvalidParam, "请求参数不合法")
+		response.Error(c, http.StatusBadRequest, codeNutritionInvalidParam, "Invalid request payload.")
 		return
 	}
 
@@ -169,7 +169,7 @@ func (h *NutritionHandler) CreateMeal(c *gin.Context) {
 	}
 
 	if err := h.db.Create(&record).Error; err != nil {
-		response.Error(c, http.StatusInternalServerError, codeNutritionDBError, "新增饮食记录失败")
+		response.Error(c, http.StatusInternalServerError, codeNutritionDBError, "Failed to create meal record.")
 		return
 	}
 
@@ -179,11 +179,11 @@ func (h *NutritionHandler) CreateMeal(c *gin.Context) {
 func (h *NutritionHandler) UpdateMeal(c *gin.Context) {
 	userID, ok := getUserIDFromContext(c)
 	if !ok {
-		response.Error(c, http.StatusUnauthorized, codeAuthFailed, "未找到用户身份")
+		response.Error(c, http.StatusUnauthorized, codeAuthFailed, "Missing user identity in context.")
 		return
 	}
 
-	mealID, err := parseUintParam(c.Param("id"), "饮食记录 id")
+	mealID, err := parseUintParam(c.Param("id"), "meal id")
 	if err != nil {
 		response.Error(c, http.StatusBadRequest, codeNutritionInvalidParam, err.Error())
 		return
@@ -192,16 +192,16 @@ func (h *NutritionHandler) UpdateMeal(c *gin.Context) {
 	var record models.MealRecord
 	if err := h.db.Where("id = ? AND user_id = ?", mealID, userID).First(&record).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			response.Error(c, http.StatusNotFound, codeNutritionNotFound, "饮食记录不存在")
+			response.Error(c, http.StatusNotFound, codeNutritionNotFound, "Meal record not found.")
 			return
 		}
-		response.Error(c, http.StatusInternalServerError, codeNutritionDBError, "查询饮食记录失败")
+		response.Error(c, http.StatusInternalServerError, codeNutritionDBError, "Failed to query meal record.")
 		return
 	}
 
 	var req mealRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, http.StatusBadRequest, codeNutritionInvalidParam, "请求参数不合法")
+		response.Error(c, http.StatusBadRequest, codeNutritionInvalidParam, "Invalid request payload.")
 		return
 	}
 
@@ -211,17 +211,17 @@ func (h *NutritionHandler) UpdateMeal(c *gin.Context) {
 		return
 	}
 	if len(updates) == 0 {
-		response.Error(c, http.StatusBadRequest, codeNutritionInvalidParam, "至少提供一个可更新字段")
+		response.Error(c, http.StatusBadRequest, codeNutritionInvalidParam, "Provide at least one updatable field.")
 		return
 	}
 
 	if err := h.db.Model(&record).Updates(updates).Error; err != nil {
-		response.Error(c, http.StatusInternalServerError, codeNutritionDBError, "更新饮食记录失败")
+		response.Error(c, http.StatusInternalServerError, codeNutritionDBError, "Failed to update meal record.")
 		return
 	}
 
 	if err := h.db.First(&record, record.ID).Error; err != nil {
-		response.Error(c, http.StatusInternalServerError, codeNutritionDBError, "查询更新后饮食记录失败")
+		response.Error(c, http.StatusInternalServerError, codeNutritionDBError, "Failed to query updated meal record.")
 		return
 	}
 	response.Success(c, http.StatusOK, toMealPayload(record))
@@ -230,11 +230,11 @@ func (h *NutritionHandler) UpdateMeal(c *gin.Context) {
 func (h *NutritionHandler) DeleteMeal(c *gin.Context) {
 	userID, ok := getUserIDFromContext(c)
 	if !ok {
-		response.Error(c, http.StatusUnauthorized, codeAuthFailed, "未找到用户身份")
+		response.Error(c, http.StatusUnauthorized, codeAuthFailed, "Missing user identity in context.")
 		return
 	}
 
-	mealID, err := parseUintParam(c.Param("id"), "饮食记录 id")
+	mealID, err := parseUintParam(c.Param("id"), "meal id")
 	if err != nil {
 		response.Error(c, http.StatusBadRequest, codeNutritionInvalidParam, err.Error())
 		return
@@ -242,11 +242,11 @@ func (h *NutritionHandler) DeleteMeal(c *gin.Context) {
 
 	result := h.db.Where("id = ? AND user_id = ?", mealID, userID).Delete(&models.MealRecord{})
 	if result.Error != nil {
-		response.Error(c, http.StatusInternalServerError, codeNutritionDBError, "删除饮食记录失败")
+		response.Error(c, http.StatusInternalServerError, codeNutritionDBError, "Failed to delete meal record.")
 		return
 	}
 	if result.RowsAffected == 0 {
-		response.Error(c, http.StatusNotFound, codeNutritionNotFound, "饮食记录不存在")
+		response.Error(c, http.StatusNotFound, codeNutritionNotFound, "Meal record not found.")
 		return
 	}
 
@@ -256,7 +256,7 @@ func (h *NutritionHandler) DeleteMeal(c *gin.Context) {
 func (h *NutritionHandler) GetActivitiesByDate(c *gin.Context) {
 	userID, ok := getUserIDFromContext(c)
 	if !ok {
-		response.Error(c, http.StatusUnauthorized, codeAuthFailed, "未找到用户身份")
+		response.Error(c, http.StatusUnauthorized, codeAuthFailed, "Missing user identity in context.")
 		return
 	}
 
@@ -272,7 +272,7 @@ func (h *NutritionHandler) GetActivitiesByDate(c *gin.Context) {
 		Where("user_id = ? AND date = ?", userID, day.Format(dateLayout)).
 		Order("start_time ASC").
 		Find(&records).Error; err != nil {
-		response.Error(c, http.StatusInternalServerError, codeNutritionDBError, "查询行程失败")
+		response.Error(c, http.StatusInternalServerError, codeNutritionDBError, "Failed to query activity records.")
 		return
 	}
 
@@ -286,13 +286,13 @@ func (h *NutritionHandler) GetActivitiesByDate(c *gin.Context) {
 func (h *NutritionHandler) CreateActivity(c *gin.Context) {
 	userID, ok := getUserIDFromContext(c)
 	if !ok {
-		response.Error(c, http.StatusUnauthorized, codeAuthFailed, "未找到用户身份")
+		response.Error(c, http.StatusUnauthorized, codeAuthFailed, "Missing user identity in context.")
 		return
 	}
 
 	var req activityRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, http.StatusBadRequest, codeNutritionInvalidParam, "请求参数不合法")
+		response.Error(c, http.StatusBadRequest, codeNutritionInvalidParam, "Invalid request payload.")
 		return
 	}
 
@@ -303,7 +303,7 @@ func (h *NutritionHandler) CreateActivity(c *gin.Context) {
 	}
 
 	if err := h.db.Create(&record).Error; err != nil {
-		response.Error(c, http.StatusInternalServerError, codeNutritionDBError, "新增行程失败")
+		response.Error(c, http.StatusInternalServerError, codeNutritionDBError, "Failed to create activity record.")
 		return
 	}
 	response.Success(c, http.StatusCreated, toActivityPayload(record))
@@ -312,11 +312,11 @@ func (h *NutritionHandler) CreateActivity(c *gin.Context) {
 func (h *NutritionHandler) UpdateActivity(c *gin.Context) {
 	userID, ok := getUserIDFromContext(c)
 	if !ok {
-		response.Error(c, http.StatusUnauthorized, codeAuthFailed, "未找到用户身份")
+		response.Error(c, http.StatusUnauthorized, codeAuthFailed, "Missing user identity in context.")
 		return
 	}
 
-	activityID, err := parseUintParam(c.Param("id"), "行程 id")
+	activityID, err := parseUintParam(c.Param("id"), "activity id")
 	if err != nil {
 		response.Error(c, http.StatusBadRequest, codeNutritionInvalidParam, err.Error())
 		return
@@ -325,16 +325,16 @@ func (h *NutritionHandler) UpdateActivity(c *gin.Context) {
 	var record models.ActivityRecord
 	if err := h.db.Where("id = ? AND user_id = ?", activityID, userID).First(&record).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			response.Error(c, http.StatusNotFound, codeNutritionNotFound, "行程不存在")
+			response.Error(c, http.StatusNotFound, codeNutritionNotFound, "Activity record not found.")
 			return
 		}
-		response.Error(c, http.StatusInternalServerError, codeNutritionDBError, "查询行程失败")
+		response.Error(c, http.StatusInternalServerError, codeNutritionDBError, "Failed to query activity record.")
 		return
 	}
 
 	var req activityRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, http.StatusBadRequest, codeNutritionInvalidParam, "请求参数不合法")
+		response.Error(c, http.StatusBadRequest, codeNutritionInvalidParam, "Invalid request payload.")
 		return
 	}
 
@@ -344,16 +344,16 @@ func (h *NutritionHandler) UpdateActivity(c *gin.Context) {
 		return
 	}
 	if len(updates) == 0 {
-		response.Error(c, http.StatusBadRequest, codeNutritionInvalidParam, "至少提供一个可更新字段")
+		response.Error(c, http.StatusBadRequest, codeNutritionInvalidParam, "Provide at least one updatable field.")
 		return
 	}
 
 	if err := h.db.Model(&record).Updates(updates).Error; err != nil {
-		response.Error(c, http.StatusInternalServerError, codeNutritionDBError, "更新行程失败")
+		response.Error(c, http.StatusInternalServerError, codeNutritionDBError, "Failed to update activity record.")
 		return
 	}
 	if err := h.db.First(&record, record.ID).Error; err != nil {
-		response.Error(c, http.StatusInternalServerError, codeNutritionDBError, "查询更新后行程失败")
+		response.Error(c, http.StatusInternalServerError, codeNutritionDBError, "Failed to query updated activity record.")
 		return
 	}
 
@@ -363,11 +363,11 @@ func (h *NutritionHandler) UpdateActivity(c *gin.Context) {
 func (h *NutritionHandler) DeleteActivity(c *gin.Context) {
 	userID, ok := getUserIDFromContext(c)
 	if !ok {
-		response.Error(c, http.StatusUnauthorized, codeAuthFailed, "未找到用户身份")
+		response.Error(c, http.StatusUnauthorized, codeAuthFailed, "Missing user identity in context.")
 		return
 	}
 
-	activityID, err := parseUintParam(c.Param("id"), "行程 id")
+	activityID, err := parseUintParam(c.Param("id"), "activity id")
 	if err != nil {
 		response.Error(c, http.StatusBadRequest, codeNutritionInvalidParam, err.Error())
 		return
@@ -375,11 +375,11 @@ func (h *NutritionHandler) DeleteActivity(c *gin.Context) {
 
 	result := h.db.Where("id = ? AND user_id = ?", activityID, userID).Delete(&models.ActivityRecord{})
 	if result.Error != nil {
-		response.Error(c, http.StatusInternalServerError, codeNutritionDBError, "删除行程失败")
+		response.Error(c, http.StatusInternalServerError, codeNutritionDBError, "Failed to delete activity record.")
 		return
 	}
 	if result.RowsAffected == 0 {
-		response.Error(c, http.StatusNotFound, codeNutritionNotFound, "行程不存在")
+		response.Error(c, http.StatusNotFound, codeNutritionNotFound, "Activity record not found.")
 		return
 	}
 
@@ -389,13 +389,13 @@ func (h *NutritionHandler) DeleteActivity(c *gin.Context) {
 func (h *NutritionHandler) GetRecommendation(c *gin.Context) {
 	userID, ok := getUserIDFromContext(c)
 	if !ok {
-		response.Error(c, http.StatusUnauthorized, codeAuthFailed, "未找到用户身份")
+		response.Error(c, http.StatusUnauthorized, codeAuthFailed, "Missing user identity in context.")
 		return
 	}
 
 	var req recommendationRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, http.StatusBadRequest, codeNutritionInvalidParam, "date 不能为空，格式为 YYYY-MM-DD")
+		response.Error(c, http.StatusBadRequest, codeNutritionInvalidParam, "date is required in YYYY-MM-DD format.")
 		return
 	}
 
@@ -407,7 +407,7 @@ func (h *NutritionHandler) GetRecommendation(c *gin.Context) {
 
 	promptData, err := h.buildRecommendationPrompt(userID, targetDate)
 	if err != nil {
-		response.Error(c, http.StatusInternalServerError, codeNutritionDBError, "生成推荐上下文失败")
+		response.Error(c, http.StatusInternalServerError, codeNutritionDBError, "Failed to build recommendation context.")
 		return
 	}
 
@@ -418,7 +418,7 @@ func (h *NutritionHandler) GetRecommendation(c *gin.Context) {
 func (h *NutritionHandler) PreviewRecommendationPrompt(c *gin.Context) {
 	userID, ok := getUserIDFromContext(c)
 	if !ok {
-		response.Error(c, http.StatusUnauthorized, codeAuthFailed, "未找到用户身份")
+		response.Error(c, http.StatusUnauthorized, codeAuthFailed, "Missing user identity in context.")
 		return
 	}
 
@@ -431,7 +431,7 @@ func (h *NutritionHandler) PreviewRecommendationPrompt(c *gin.Context) {
 
 	promptData, err := h.buildRecommendationPrompt(userID, targetDate)
 	if err != nil {
-		response.Error(c, http.StatusInternalServerError, codeNutritionDBError, "生成推荐上下文失败")
+		response.Error(c, http.StatusInternalServerError, codeNutritionDBError, "Failed to build recommendation context.")
 		return
 	}
 	response.Success(c, http.StatusOK, promptData)
@@ -645,7 +645,7 @@ func buildRecommendationFromPrompt(targetDate time.Time, promptData *recommendat
 		{"type": "dinner", "content": "Steamed fish + broccoli + sweet potato"},
 	}
 
-	// 若有明确偏好，把第一条建议做轻量替换，前端可直接展示。
+	// If dietary preference exists, lightly adjust the first suggestion.
 	if len(promptData.User.DietaryPreferences) > 0 {
 		pref := promptData.User.DietaryPreferences[0]
 		suggestedMeals[0]["content"] = fmt.Sprintf("Preference-based (%s): soy milk + whole-grain toast + mixed nuts", pref)
@@ -699,10 +699,10 @@ func buildMealRecord(userID uint, req mealRequest) (models.MealRecord, error) {
 	}
 	content := strings.TrimSpace(firstNotEmpty(req.Content, req.Name))
 	if content == "" {
-		return models.MealRecord{}, errors.New("content 不能为空")
+		return models.MealRecord{}, errors.New("content is required.")
 	}
 	if req.Calories != nil && *req.Calories < 0 {
-		return models.MealRecord{}, errors.New("calories 不能小于 0")
+		return models.MealRecord{}, errors.New("calories cannot be negative.")
 	}
 
 	record := models.MealRecord{
@@ -746,7 +746,7 @@ func buildMealUpdates(req mealRequest) (map[string]interface{}, error) {
 
 	if req.Calories != nil {
 		if *req.Calories < 0 {
-			return nil, errors.New("calories 不能小于 0")
+			return nil, errors.New("calories cannot be negative.")
 		}
 		updates["calories"] = *req.Calories
 	}
@@ -776,7 +776,7 @@ func buildActivityRecord(userID uint, req activityRequest) (models.ActivityRecor
 	}
 	title := strings.TrimSpace(req.Title)
 	if title == "" {
-		return models.ActivityRecord{}, errors.New("title 不能为空")
+		return models.ActivityRecord{}, errors.New("title is required.")
 	}
 
 	start := strings.TrimSpace(firstNotEmpty(req.StartTime, req.StartTimeAlt))
@@ -843,11 +843,11 @@ const dateLayout = "2006-01-02"
 func parseDate(raw string) (time.Time, error) {
 	text := strings.TrimSpace(raw)
 	if text == "" {
-		return time.Time{}, errors.New("date 不能为空，格式为 YYYY-MM-DD")
+		return time.Time{}, errors.New("date is required in YYYY-MM-DD format.")
 	}
 	date, err := time.Parse(dateLayout, text)
 	if err != nil {
-		return time.Time{}, errors.New("date 格式错误，应为 YYYY-MM-DD")
+		return time.Time{}, errors.New("Invalid date format. Expected YYYY-MM-DD.")
 	}
 	return date, nil
 }
@@ -857,7 +857,7 @@ func normalizeMealType(raw string) (string, error) {
 	case "breakfast", "lunch", "dinner", "snack":
 		return strings.ToLower(strings.TrimSpace(raw)), nil
 	default:
-		return "", errors.New("meal type 仅支持 breakfast/lunch/dinner/snack")
+		return "", errors.New("meal type must be one of breakfast/lunch/dinner/snack.")
 	}
 }
 
@@ -872,10 +872,10 @@ func normalizeIntensity(raw string) string {
 
 func validateClock(raw string) error {
 	if len(raw) != 5 {
-		return errors.New("格式错误，应为 HH:MM")
+		return errors.New("invalid time format. Expected HH:MM.")
 	}
 	if _, err := time.Parse("15:04", raw); err != nil {
-		return errors.New("格式错误，应为 HH:MM")
+		return errors.New("invalid time format. Expected HH:MM.")
 	}
 	return nil
 }
@@ -883,12 +883,12 @@ func validateClock(raw string) error {
 func parseUintParam(raw string, fieldName string) (uint, error) {
 	text := strings.TrimSpace(raw)
 	if text == "" {
-		return 0, fmt.Errorf("%s 不能为空", fieldName)
+		return 0, fmt.Errorf("%s is required", fieldName)
 	}
 
 	id64, err := strconv.ParseUint(text, 10, 32)
 	if err != nil {
-		return 0, fmt.Errorf("%s 非法", fieldName)
+		return 0, fmt.Errorf("%s is invalid", fieldName)
 	}
 	return uint(id64), nil
 }

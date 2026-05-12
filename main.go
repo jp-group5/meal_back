@@ -19,15 +19,15 @@ func main() {
 	jwtSecret := os.Getenv("JWT_SECRET")
 
 	if dsn == "" {
-		log.Fatal("缺少环境变量 DB_DSN")
+		log.Fatal("Missing environment variable DB_DSN")
 	}
 	if jwtSecret == "" {
-		log.Fatal("缺少环境变量 JWT_SECRET")
+		log.Fatal("Missing environment variable JWT_SECRET")
 	}
 
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
-		log.Fatalf("数据库连接失败: %v", err)
+		log.Fatalf("Failed to connect to database: %v", err)
 	}
 
 	// 迁移顺序：先用户主表，再会话/资料/业务记录表。
@@ -38,7 +38,7 @@ func main() {
 		&models.MealRecord{},
 		&models.ActivityRecord{},
 	); err != nil {
-		log.Fatalf("数据库迁移失败: %v", err)
+		log.Fatalf("Database migration failed: %v", err)
 	}
 
 	tokenBlacklist := stores.NewTokenBlacklistStore()
@@ -78,6 +78,6 @@ func main() {
 	}
 
 	if err := r.Run(":8080"); err != nil {
-		log.Fatalf("服务启动失败: %v", err)
+		log.Fatalf("Failed to start server: %v", err)
 	}
 }
