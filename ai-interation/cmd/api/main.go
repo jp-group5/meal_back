@@ -6,32 +6,25 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"ai-interation/internal/config"
-	"ai-interation/internal/handler"
-	"ai-interation/internal/infrastructure/mock"
-	openaiinfra "ai-interation/internal/infrastructure/openai"
-	"ai-interation/internal/router"
-	"ai-interation/internal/usecase"
+	"ai-interation/internal/httpapi"
+	"ai-interation/internal/infra/openai"
+	"ai-interation/internal/infra/repository"
+	"ai-interation/internal/service"
 )
 
 func main() {
 	cfg := config.Load()
 
-	aiClient, err := openaiinfra.NewClientFromEnv()
+	aiClient, err := openai.NewClientFromEnv()
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	repo := mock.NewRepositoryMock()
-
-	mealUC := usecase.NewMealAnalysisUsecase(aiClient, repo)
-	recUC := usecase.NewRecommendationUsecase(aiClient, repo)
+	repo := repository.NewMockRepository()
+	svc := service.NewService(aiClient, repo)
 
 	r := gin.Default()
-	router.RegisterRoutes(
-		r,
-		handler.NewMealAnalysisHandler(mealUC),
-		handler.NewRecommendationHandler(recUC),
-	)
+	httpapi.RegisterRoutes(r, httpapi.NewHandler(svc))
 
 	log.Printf("server starting on %s", cfg.Port)
 	if err := r.Run(cfg.Port); err != nil {

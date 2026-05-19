@@ -13,5 +13,6 @@ func Load() Config {
 	} else if port[0] != ':' {
 		port = ":" + port
 	}
+
 	return Config{Port: port}
 }

@@ -11,8 +11,6 @@ import (
 	"os"
 	"strings"
 	"time"
-
-	"ai-interation/internal/port"
 )
 
 type Client struct {
@@ -33,44 +31,34 @@ func NewClientFromEnv() (*Client, error) {
 	}
 
 	return &Client{
-		apiKey: apiKey,
-		model:  model,
+		apiKey:     apiKey,
+		model:      model,
 		httpClient: &http.Client{Timeout: 60 * time.Second},
 	}, nil
-}
-
-type responseAPIResponse struct {
-	OutputText string `json:"output_text"`
-	Output     []struct {
-		Type    string `json:"type"`
-		Role    string `json:"role"`
-		Content []struct {
-			Type string `json:"type"`
-			Text string `json:"text"`
-		} `json:"content"`
-	} `json:"output"`
-	Usage struct {
-		InputTokens  int `json:"input_tokens"`
-		OutputTokens int `json:"output_tokens"`
-		TotalTokens  int `json:"total_tokens"`
-	} `json:"usage"`
 }
 
 func (c *Client) AnalyzeMeal(ctx context.Context, imageBytes []byte) (string, error) {
 	schema := map[string]any{
 		"type": "object",
 		"properties": map[string]any{
-			"date": map[string]any{"type": "string"},
-			"content": map[string]any{
+			"contents": map[string]any{
 				"type": "array",
 				"items": map[string]any{"type": "string"},
 			},
-			"calories": map[string]any{"type": "number"},
-			"protein":  map[string]any{"type": "number"},
-			"fat":      map[string]any{"type": "number"},
-			"carbs":    map[string]any{"type": "number"},
+			"total_nutrition": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"calories": map[string]any{"type": "number"},
+					"protein":  map[string]any{"type": "number"},
+					"fat":      map[string]any{"type": "number"},
+					"carbs":    map[string]any{"type": "number"},
+				},
+				"required": []string{"calories", "protein", "fat", "carbs"},
+				"additionalProperties": false,
+			},
+			"error": map[string]any{"type": "null"},
 		},
-		"required": []string{"date", "content", "calories", "protein", "fat", "carbs"},
+		"required": []string{"contents", "total_nutrition", "error"},
 		"additionalProperties": false,
 	}
 
@@ -82,7 +70,7 @@ func (c *Client) AnalyzeMeal(ctx context.Context, imageBytes []byte) (string, er
 				"content": []any{
 					map[string]any{
 						"type": "input_text",
-						"text": "食事画像を解析し、献立名と栄養成分をJSONだけで返してください。",
+						"text": "食事画像を解析し、料理名の一覧と合計栄養成分をJSONだけで返してください。",
 					},
 					map[string]any{
 						"type":      "input_image",
@@ -92,17 +80,10 @@ func (c *Client) AnalyzeMeal(ctx context.Context, imageBytes []byte) (string, er
 				},
 			},
 		},
-		"text": map[string]any{
-			"format": map[string]any{
-				"type":   "json_schema",
-				"name":   "meal_analysis",
-				"schema": schema,
-				"strict": true,
-			},
-		},
+		"text": jsonSchemaFormat("meal_analysis", schema),
 	}
 
-	return c.callResponsesAPI(ctx, body)
+	return c.call(ctx, body)
 }
 
 func (c *Client) GenerateRecommendation(ctx context.Context, prompt string) (string, error) {
@@ -144,20 +125,39 @@ func (c *Client) GenerateRecommendation(ctx context.Context, prompt string) (str
 				},
 			},
 		},
-		"text": map[string]any{
-			"format": map[string]any{
-				"type":   "json_schema",
-				"name":   "recommendation",
-				"schema": schema,
-				"strict": true,
-			},
-		},
+		"text": jsonSchemaFormat("recommendation", schema),
 	}
 
-	return c.callResponsesAPI(ctx, body)
+	return c.call(ctx, body)
 }
 
-func (c *Client) callResponsesAPI(ctx context.Context, payload any) (string, error) {
+func jsonSchemaFormat(name string, schema map[string]any) map[string]any {
+	return map[string]any{
+		"format": map[string]any{
+			"type":   "json_schema",
+			"name":   name,
+			"schema": schema,
+			"strict": true,
+		},
+	}
+}
+
+type responseBody struct {
+	OutputText string `json:"output_text"`
+	Output     []struct {
+		Content []struct {
+			Type string `json:"type"`
+			Text string `json:"text"`
+		} `json:"content"`
+	} `json:"output"`
+	Usage struct {
+		InputTokens  int `json:"input_tokens"`
+		OutputTokens int `json:"output_tokens"`
+		TotalTokens  int `json:"total_tokens"`
+	} `json:"usage"`
+}
+
+func (c *Client) call(ctx context.Context, payload any) (string, error) {
 	b, err := json.Marshal(payload)
 	if err != nil {
 		return "", err
@@ -167,6 +167,7 @@ func (c *Client) callResponsesAPI(ctx context.Context, payload any) (string, err
 	if err != nil {
 		return "", err
 	}
+
 	req.Header.Set("Authorization", "Bearer "+c.apiKey)
 	req.Header.Set("Content-Type", "application/json")
 
@@ -182,35 +183,39 @@ func (c *Client) callResponsesAPI(ctx context.Context, payload any) (string, err
 		return "", fmt.Errorf("openai api status: %s, body: %s", resp.Status, buf.String())
 	}
 
-	var out responseAPIResponse
+	var out responseBody
 	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
 		return "", err
 	}
 
-	raw := extractOutputText(out)
-	if strings.TrimSpace(raw) == "" {
+	fmt.Printf(
+		"[OpenAI usage] input=%d output=%d total=%d\n",
+		out.Usage.InputTokens,
+		out.Usage.OutputTokens,
+		out.Usage.TotalTokens,
+	)
+
+	text := extractText(out)
+	if strings.TrimSpace(text) == "" {
 		return "", errors.New("openai returned empty output text")
 	}
 
-	fmt.Printf("[OpenAI usage] input=%d output=%d total=%d\n", out.Usage.InputTokens, out.Usage.OutputTokens, out.Usage.TotalTokens)
-
-	return raw, nil
+	return text, nil
 }
 
-func extractOutputText(out responseAPIResponse) string {
+func extractText(out responseBody) string {
 	if strings.TrimSpace(out.OutputText) != "" {
 		return out.OutputText
 	}
 
 	var parts []string
 	for _, item := range out.Output {
-		for _, c := range item.Content {
-			if strings.TrimSpace(c.Text) != "" {
-				parts = append(parts, c.Text)
+		for _, content := range item.Content {
+			if strings.TrimSpace(content.Text) != "" {
+				parts = append(parts, content.Text)
 			}
 		}
 	}
+
 	return strings.Join(parts, "")
 }
-
-var _ port.AIClient = (*Client)(nil)
