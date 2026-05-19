@@ -1,0 +1,9 @@
+.git
+.gitignore
+.DS_Store
+.env
+.env.local
+.env.docker
+docs/*.local.md
+scripts/local/
+json/

@@ -1,0 +1,38 @@
+services:
+  db:
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-meal_app}
+      POSTGRES_USER: ${POSTGRES_USER:-meal}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-meal}
+    ports:
+      - "${DB_PORT_HOST:-5432}:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DB_DSN: postgres://${POSTGRES_USER:-meal}:${POSTGRES_PASSWORD:-meal}@db:5432/${POSTGRES_DB:-meal_app}?sslmode=disable
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+    ports:
+      - "${API_PORT:-8080}:8080"
+    volumes:
+      - .:/app
+      - go_mod_cache:/go/pkg/mod
+
+volumes:
+  db_data:
+  go_mod_cache:
